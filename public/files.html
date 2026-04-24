@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>我的文件</title>
+</head>
+<body>
+    <h2>我的文件</h2>
+
+    <input type="file" id="file">
+    <button onclick="uploadFile()">上传</button>
+    <button onclick="logout()">退出登录</button>
+
+    <p id="msg"></p>
+
+    <h3>文件列表</h3>
+    <ul id="list"></ul>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById("file");
+
+            if (!fileInput.files[0]) {
+                alert("请先选择文件");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            const res = await fetch("/api/upload", {
+                method: "POST",
+                body: formData
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById("msg").innerText = "上传成功";
+                fileInput.value = "";
+                loadFiles();
+            } else {
+                document.getElementById("msg").innerText = data.error;
+            }
+        }
+
+        async function loadFiles() {
+            const res = await fetch("/api/files");
+
+            if (!res.ok) {
+                window.location.href = "/login.html";
+                return;
+            }
+
+            const files = await res.json();
+
+            document.getElementById("list").innerHTML = files.map(function (file) {
+                return `
+              <li>
+                ${file.original_name}
+                上传时间：${file.uploaded_at}
+                <a href="/api/download/${file.id}">下载</a>
+              </li>
+            `;
+            }).join("");
+        }
+
+        async function logout() {
+            await fetch("/api/logout", {
+                method: "POST"
+            });
+
+            window.location.href = "/login.html";
+        }
+
+        loadFiles();
+    </script>
+</body>
+</html>
