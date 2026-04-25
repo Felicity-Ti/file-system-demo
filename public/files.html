@@ -193,6 +193,7 @@
               <thead>
                 <tr>
                   <th>文件名</th>
+                  <th>大小</th>
                   <th>上传时间</th>
                   <th>操作</th>
                 </tr>
@@ -201,6 +202,7 @@
                 ${files.map(file => `
                   <tr>
                     <td>${file.original_name}</td>
+                    <td>${formatSize(file.size)}</td>
                     <td>${file.uploaded_at}</td>
                     <td>
                       <div class="actions">
@@ -240,6 +242,13 @@
             });
 
             window.location.href = "login.html";
+        }
+
+        function formatSize(size) {
+            if (!size) return "-";
+            if (size < 1024) return size + " B";
+            if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+            return (size / 1024 / 1024).toFixed(1) + " MB";
         }
 
         loadFiles();

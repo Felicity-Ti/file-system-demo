@@ -55,9 +55,12 @@ db.run(`
     user_id INTEGER,
     original_name TEXT,
     saved_name TEXT,
+    size INTEGER,
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
+
+db.run("ALTER TABLE files ADD COLUMN size INTEGER", function () {});
 
 function fixFileName(name) {
   return Buffer.from(name, "latin1").toString("utf8");
@@ -132,22 +135,21 @@ app.post("/api/upload", requireLogin, upload.single("file"), function (req, res)
 
   const originalName = fixFileName(req.file.originalname);
 
-  db.run(
-    "INSERT INTO files (user_id, original_name, saved_name) VALUES (?, ?, ?)",
-    [req.session.userId, originalName, req.file.filename],
-    function (err) {
-      if (err) {
-        return res.status(500).json({ error: "保存文件信息失败" });
-      }
-
-      res.json({ message: "上传成功" });
+db.run(
+  "INSERT INTO files (user_id, original_name, saved_name, size) VALUES (?, ?, ?, ?)",
+  [req.session.userId, originalName, req.file.filename, req.file.size],
+  function (err) {
+    if (err) {
+      return res.status(500).json({ error: "保存文件信息失败" });
     }
-  );
-});
+
+    res.json({ message: "上传成功" });
+  }
+);
 
 app.get("/api/files", requireLogin, function (req, res) {
   db.all(
-    "SELECT id, original_name, uploaded_at FROM files WHERE user_id = ? ORDER BY id DESC",
+    "SELECT id, original_name, size, uploaded_at FROM files WHERE user_id = ? ORDER BY id DESC",
     [req.session.userId],
     function (err, rows) {
       if (err) {
