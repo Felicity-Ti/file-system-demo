@@ -5,6 +5,7 @@ const bcrypt = require("bcrypt");
 const session = require("express-session");
 const path = require("path");
 const fs = require("fs");
+const cors = require("cors");
 
 const app = express();
 const db = new sqlite3.Database("data.db");
@@ -17,6 +18,11 @@ if (!fs.existsSync("uploads")) {
 // 中间件
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+app.use(cors({
+  origin: true,
+  credentials: true
+}));
 
 app.use(session({
   secret: "please-change-this-secret",

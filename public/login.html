@@ -18,15 +18,18 @@
     <p id="msg"></p>
 
     <script>
+        const API_BASE = "https://file-system-demo-production.up.railway.app";
+
         async function login() {
             const username = document.getElementById("username").value;
             const password = document.getElementById("password").value;
 
-            const res = await fetch("/api/login", {
+            const res = await fetch(API_BASE + "/api/login", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
+                credentials: "include",
                 body: JSON.stringify({
                     username: username,
                     password: password
@@ -36,9 +39,9 @@
             const data = await res.json();
 
             if (res.ok) {
-                window.location.href = "/files.html";
+                window.location.href = "files.html";
             } else {
-                document.getElementById("msg").innerText = data.error;
+                document.getElementById("msg").innerText = data.error || "登录失败";
             }
         }
     </script>

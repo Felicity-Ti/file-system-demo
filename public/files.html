@@ -17,6 +17,8 @@
     <ul id="list"></ul>
 
     <script>
+        const API_BASE = "https://file-system-demo-production.up.railway.app";
+
         async function uploadFile() {
             const fileInput = document.getElementById("file");
 
@@ -28,8 +30,9 @@
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
 
-            const res = await fetch("/api/upload", {
+            const res = await fetch(API_BASE + "/api/upload", {
                 method: "POST",
+                credentials: "include",
                 body: formData
             });
 
@@ -40,15 +43,17 @@
                 fileInput.value = "";
                 loadFiles();
             } else {
-                document.getElementById("msg").innerText = data.error;
+                document.getElementById("msg").innerText = data.error || "上传失败";
             }
         }
 
         async function loadFiles() {
-            const res = await fetch("/api/files");
+            const res = await fetch(API_BASE + "/api/files", {
+                credentials: "include"
+            });
 
             if (!res.ok) {
-                window.location.href = "/login.html";
+                window.location.href = "login.html";
                 return;
             }
 
@@ -59,18 +64,19 @@
               <li>
                 ${file.original_name}
                 上传时间：${file.uploaded_at}
-                <a href="/api/download/${file.id}">下载</a>
+                <a href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
               </li>
             `;
             }).join("");
         }
 
         async function logout() {
-            await fetch("/api/logout", {
-                method: "POST"
+            await fetch(API_BASE + "/api/logout", {
+                method: "POST",
+                credentials: "include"
             });
 
-            window.location.href = "/login.html";
+            window.location.href = "login.html";
         }
 
         loadFiles();
