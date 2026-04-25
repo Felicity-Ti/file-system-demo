@@ -10,20 +10,25 @@ const cors = require("cors");
 const app = express();
 const db = new sqlite3.Database("data.db");
 
+// 创建 uploads 文件夹
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
+// 基础中间件
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// 允许跨域请求
 app.use(cors({
   origin: true,
   credentials: true
 }));
 
+// Railway / HTTPS 代理设置
 app.set("trust proxy", 1);
 
+// 登录 session
 app.use(session({
   secret: "please-change-this-secret",
   resave: false,
@@ -35,12 +40,14 @@ app.use(session({
   }
 }));
 
+// 静态页面
 app.use(express.static("public"));
 
 app.get("/", function (req, res) {
   res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
+// 初始化数据库表
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,14 +62,20 @@ db.run(`
     user_id INTEGER,
     original_name TEXT,
     saved_name TEXT,
+    size INTEGER,
     uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )
 `);
 
+// 兼容旧数据库：如果旧表没有 size 字段，自动补上
+db.run("ALTER TABLE files ADD COLUMN size INTEGER", function () {});
+
+// 修复中文文件名乱码
 function fixFileName(name) {
   return Buffer.from(name, "latin1").toString("utf8");
 }
 
+// 文件上传配置
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: function (req, file, cb) {
@@ -79,13 +92,16 @@ const upload = multer({
   }
 });
 
+// 登录检查
 function requireLogin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "请先登录" });
   }
+
   next();
 }
 
+// 初始化管理员账号
 app.get("/init", async function (req, res) {
   const username = "admin";
   const password = "123456";
@@ -98,11 +114,13 @@ app.get("/init", async function (req, res) {
       if (err) {
         return res.status(500).send("初始化失败");
       }
+
       res.send("初始化完成，账号：admin，密码：123456");
     }
   );
 });
 
+// 登录
 app.post("/api/login", function (req, res) {
   const username = req.body.username;
   const password = req.body.password;
@@ -111,11 +129,19 @@ app.post("/api/login", function (req, res) {
     "SELECT * FROM users WHERE username = ?",
     [username],
     async function (err, user) {
-      if (err) return res.status(500).json({ error: "服务器错误" });
-      if (!user) return res.status(401).json({ error: "账号或密码错误" });
+      if (err) {
+        return res.status(500).json({ error: "服务器错误" });
+      }
+
+      if (!user) {
+        return res.status(401).json({ error: "账号或密码错误" });
+      }
 
       const ok = await bcrypt.compare(password, user.password_hash);
-      if (!ok) return res.status(401).json({ error: "账号或密码错误" });
+
+      if (!ok) {
+        return res.status(401).json({ error: "账号或密码错误" });
+      }
 
       req.session.userId = user.id;
       req.session.username = user.username;
@@ -125,6 +151,7 @@ app.post("/api/login", function (req, res) {
   );
 });
 
+// 上传文件
 app.post("/api/upload", requireLogin, upload.single("file"), function (req, res) {
   if (!req.file) {
     return res.status(400).json({ error: "请选择文件" });
@@ -133,8 +160,8 @@ app.post("/api/upload", requireLogin, upload.single("file"), function (req, res)
   const originalName = fixFileName(req.file.originalname);
 
   db.run(
-    "INSERT INTO files (user_id, original_name, saved_name) VALUES (?, ?, ?)",
-    [req.session.userId, originalName, req.file.filename],
+    "INSERT INTO files (user_id, original_name, saved_name, size) VALUES (?, ?, ?, ?)",
+    [req.session.userId, originalName, req.file.filename, req.file.size],
     function (err) {
       if (err) {
         return res.status(500).json({ error: "保存文件信息失败" });
@@ -145,26 +172,34 @@ app.post("/api/upload", requireLogin, upload.single("file"), function (req, res)
   );
 });
 
+// 文件列表
 app.get("/api/files", requireLogin, function (req, res) {
   db.all(
-    "SELECT id, original_name, uploaded_at FROM files WHERE user_id = ? ORDER BY id DESC",
+    "SELECT id, original_name, size, uploaded_at FROM files WHERE user_id = ? ORDER BY id DESC",
     [req.session.userId],
     function (err, rows) {
       if (err) {
         return res.status(500).json({ error: "读取文件列表失败" });
       }
+
       res.json(rows);
     }
   );
 });
 
+// 下载文件
 app.get("/api/download/:id", requireLogin, function (req, res) {
   db.get(
     "SELECT * FROM files WHERE id = ? AND user_id = ?",
     [req.params.id, req.session.userId],
     function (err, file) {
-      if (err) return res.status(500).send("服务器错误");
-      if (!file) return res.status(404).send("文件不存在");
+      if (err) {
+        return res.status(500).send("服务器错误");
+      }
+
+      if (!file) {
+        return res.status(404).send("文件不存在");
+      }
 
       const filePath = path.join(__dirname, "uploads", file.saved_name);
 
@@ -173,13 +208,19 @@ app.get("/api/download/:id", requireLogin, function (req, res) {
   );
 });
 
+// 删除文件
 app.delete("/api/file/:id", requireLogin, function (req, res) {
   db.get(
     "SELECT * FROM files WHERE id = ? AND user_id = ?",
     [req.params.id, req.session.userId],
     function (err, file) {
-      if (err) return res.status(500).json({ error: "服务器错误" });
-      if (!file) return res.status(404).json({ error: "文件不存在" });
+      if (err) {
+        return res.status(500).json({ error: "服务器错误" });
+      }
+
+      if (!file) {
+        return res.status(404).json({ error: "文件不存在" });
+      }
 
       const filePath = path.join(__dirname, "uploads", file.saved_name);
 
@@ -200,12 +241,14 @@ app.delete("/api/file/:id", requireLogin, function (req, res) {
   );
 });
 
+// 退出登录
 app.post("/api/logout", function (req, res) {
   req.session.destroy(function () {
     res.json({ message: "已退出登录" });
   });
 });
 
+// 启动服务器
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, function () {
