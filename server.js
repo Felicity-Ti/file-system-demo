@@ -10,12 +10,10 @@ const cors = require("cors");
 const app = express();
 const db = new sqlite3.Database("data.db");
 
-// 创建 uploads 目录
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
 }
 
-// 中间件
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -24,21 +22,25 @@ app.use(cors({
   credentials: true
 }));
 
+app.set("trust proxy", 1);
+
 app.use(session({
   secret: "please-change-this-secret",
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none"
+  }
 }));
 
-// 静态文件（前端页面）
 app.use(express.static("public"));
 
-// 首页（默认打开 login.html）
 app.get("/", function (req, res) {
   res.sendFile(path.join(__dirname, "public", "login.html"));
 });
 
-// 初始化数据库
 db.run(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -57,11 +59,15 @@ db.run(`
   )
 `);
 
-// 文件上传配置
+function fixFileName(name) {
+  return Buffer.from(name, "latin1").toString("utf8");
+}
+
 const storage = multer.diskStorage({
   destination: "uploads/",
   filename: function (req, file, cb) {
-    const safeName = Date.now() + "-" + file.originalname;
+    const originalName = fixFileName(file.originalname);
+    const safeName = Date.now() + "-" + originalName;
     cb(null, safeName);
   }
 });
@@ -73,7 +79,6 @@ const upload = multer({
   }
 });
 
-// 登录校验
 function requireLogin(req, res, next) {
   if (!req.session.userId) {
     return res.status(401).json({ error: "请先登录" });
@@ -81,7 +86,6 @@ function requireLogin(req, res, next) {
   next();
 }
 
-// 初始化账号
 app.get("/init", async function (req, res) {
   const username = "admin";
   const password = "123456";
@@ -99,7 +103,6 @@ app.get("/init", async function (req, res) {
   );
 });
 
-// 登录
 app.post("/api/login", function (req, res) {
   const username = req.body.username;
   const password = req.body.password;
@@ -122,15 +125,16 @@ app.post("/api/login", function (req, res) {
   );
 });
 
-// 上传文件
 app.post("/api/upload", requireLogin, upload.single("file"), function (req, res) {
   if (!req.file) {
     return res.status(400).json({ error: "请选择文件" });
   }
 
+  const originalName = fixFileName(req.file.originalname);
+
   db.run(
     "INSERT INTO files (user_id, original_name, saved_name) VALUES (?, ?, ?)",
-    [req.session.userId, req.file.originalname, req.file.filename],
+    [req.session.userId, originalName, req.file.filename],
     function (err) {
       if (err) {
         return res.status(500).json({ error: "保存文件信息失败" });
@@ -141,7 +145,6 @@ app.post("/api/upload", requireLogin, upload.single("file"), function (req, res)
   );
 });
 
-// 文件列表
 app.get("/api/files", requireLogin, function (req, res) {
   db.all(
     "SELECT id, original_name, uploaded_at FROM files WHERE user_id = ? ORDER BY id DESC",
@@ -155,7 +158,6 @@ app.get("/api/files", requireLogin, function (req, res) {
   );
 });
 
-// 下载文件
 app.get("/api/download/:id", requireLogin, function (req, res) {
   db.get(
     "SELECT * FROM files WHERE id = ? AND user_id = ?",
@@ -165,19 +167,45 @@ app.get("/api/download/:id", requireLogin, function (req, res) {
       if (!file) return res.status(404).send("文件不存在");
 
       const filePath = path.join(__dirname, "uploads", file.saved_name);
+
       res.download(filePath, file.original_name);
     }
   );
 });
 
-// 退出登录
+app.delete("/api/file/:id", requireLogin, function (req, res) {
+  db.get(
+    "SELECT * FROM files WHERE id = ? AND user_id = ?",
+    [req.params.id, req.session.userId],
+    function (err, file) {
+      if (err) return res.status(500).json({ error: "服务器错误" });
+      if (!file) return res.status(404).json({ error: "文件不存在" });
+
+      const filePath = path.join(__dirname, "uploads", file.saved_name);
+
+      fs.unlink(filePath, function () {
+        db.run(
+          "DELETE FROM files WHERE id = ? AND user_id = ?",
+          [req.params.id, req.session.userId],
+          function (err) {
+            if (err) {
+              return res.status(500).json({ error: "删除数据库记录失败" });
+            }
+
+            res.json({ message: "删除成功" });
+          }
+        );
+      });
+    }
+  );
+});
+
 app.post("/api/logout", function (req, res) {
   req.session.destroy(function () {
     res.json({ message: "已退出登录" });
   });
 });
 
-// 启动服务器
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, function () {

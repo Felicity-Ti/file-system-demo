@@ -3,29 +3,151 @@
 <head>
     <meta charset="UTF-8">
     <title>我的文件</title>
+    <style>
+        body {
+            font-family: Arial, "Microsoft YaHei", sans-serif;
+            background: #f5f7fb;
+            margin: 0;
+            padding: 40px;
+            color: #222;
+        }
+
+        .box {
+            max-width: 960px;
+            margin: 0 auto;
+            background: white;
+            padding: 28px;
+            border-radius: 14px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+        }
+
+        .top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 28px;
+        }
+
+        .upload-area {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 18px;
+            background: #f0f4ff;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        button, .download {
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+
+        .btn-upload {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-logout {
+            background: #555;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #dc2626;
+            color: white;
+        }
+
+        .download {
+            background: #16a34a;
+            color: white;
+        }
+
+            button:hover, .download:hover {
+                opacity: 0.85;
+            }
+
+        #msg {
+            min-height: 24px;
+            color: #2563eb;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        th, td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            text-align: left;
+        }
+
+        th {
+            background: #f9fafb;
+            color: #555;
+        }
+
+        .actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .empty {
+            text-align: center;
+            color: #888;
+            padding: 40px;
+            background: #fafafa;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <h2>我的文件</h2>
+    <div class="box">
+        <div class="top">
+            <h2>我的文件</h2>
+            <button class="btn-logout" onclick="logout()">退出登录</button>
+        </div>
 
-    <input type="file" id="file">
-    <button onclick="uploadFile()">上传</button>
-    <button onclick="logout()">退出登录</button>
+        <div class="upload-area">
+            <input type="file" id="file">
+            <button class="btn-upload" onclick="uploadFile()">上传文件</button>
+        </div>
 
-    <p id="msg"></p>
+        <p id="msg"></p>
 
-    <h3>文件列表</h3>
-    <ul id="list"></ul>
+        <h3>文件列表</h3>
+
+        <div id="fileArea">
+            <div class="empty">正在加载文件...</div>
+        </div>
+    </div>
 
     <script>
         const API_BASE = "https://file-system-demo-production.up.railway.app";
 
         async function uploadFile() {
             const fileInput = document.getElementById("file");
+            const msg = document.getElementById("msg");
 
             if (!fileInput.files[0]) {
                 alert("请先选择文件");
                 return;
             }
+
+            msg.innerText = "正在上传...";
 
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
@@ -39,35 +161,76 @@
             const data = await res.json();
 
             if (res.ok) {
-                document.getElementById("msg").innerText = "上传成功";
+                msg.innerText = "上传成功";
                 fileInput.value = "";
                 loadFiles();
             } else {
-                document.getElementById("msg").innerText = data.error || "上传失败";
+                msg.innerText = data.error || "上传失败";
             }
         }
 
         async function loadFiles() {
+            const fileArea = document.getElementById("fileArea");
+
             const res = await fetch(API_BASE + "/api/files", {
                 credentials: "include"
             });
 
-            if (!res.ok) {
-                window.location.href = "login.html";
+            if (res.status === 401) {
+                document.getElementById("fileArea").innerHTML = "未登录，请重新登录";
                 return;
             }
 
             const files = await res.json();
 
-            document.getElementById("list").innerHTML = files.map(function (file) {
-                return `
-              <li>
-                ${file.original_name}
-                上传时间：${file.uploaded_at}
-                <a href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
-              </li>
-            `;
-            }).join("");
+            if (files.length === 0) {
+                fileArea.innerHTML = `<div class="empty">暂无文件，请先上传</div>`;
+                return;
+            }
+
+            fileArea.innerHTML = `
+            <table>
+              <thead>
+                <tr>
+                  <th>文件名</th>
+                  <th>上传时间</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${files.map(file => `
+                  <tr>
+                    <td>${file.original_name}</td>
+                    <td>${file.uploaded_at}</td>
+                    <td>
+                      <div class="actions">
+                        <a class="download" href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
+                        <button class="btn-delete" onclick="deleteFile(${file.id})">删除</button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          `;
+        }
+
+        async function deleteFile(id) {
+            if (!confirm("确定删除这个文件吗？")) return;
+
+            const res = await fetch(API_BASE + "/api/file/" + id, {
+                method: "DELETE",
+                credentials: "include"
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                document.getElementById("msg").innerText = "删除成功";
+                loadFiles();
+            } else {
+                document.getElementById("msg").innerText = data.error || "删除失败";
+            }
         }
 
         async function logout() {

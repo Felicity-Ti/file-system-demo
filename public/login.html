@@ -39,7 +39,7 @@
             const data = await res.json();
 
             if (res.ok) {
-                window.location.href = "files.html";
+                window.location.href = API_BASE + "/files.html";
             } else {
                 document.getElementById("msg").innerText = data.error || "登录失败";
             }
