@@ -274,6 +274,13 @@
             return (size / 1024 / 1024).toFixed(1) + " MB";
         }
 
+        function escapeText(text) {
+            return String(text)
+                .replace(/\\/g, "\\\\")
+                .replace(/'/g, "\\'")
+                .replace(/"/g, "&quot;");
+        }
+
         loadFiles();
     </script>
 </body>
