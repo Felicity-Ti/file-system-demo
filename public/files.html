@@ -177,51 +177,62 @@
         async function loadFiles() {
             const fileArea = document.getElementById("fileArea");
 
-            const res = await fetch(API_BASE + "/api/files", {
-                credentials: "include"
-            });
+            try {
+                const res = await fetch(API_BASE + "/api/files", {
+                    credentials: "include"
+                });
 
-            if (res.status === 401) {
-                document.getElementById("fileArea").innerHTML = "未登录，请重新登录";
-                return;
+                if (res.status === 401) {
+                    fileArea.innerHTML = `<div class="empty">未登录，请重新登录</div>`;
+                    return;
+                }
+
+                if (!res.ok) {
+                    fileArea.innerHTML = `<div class="empty">读取文件失败，状态码：${res.status}</div>`;
+                    return;
+                }
+
+                const files = await res.json();
+
+                if (files.length === 0) {
+                    fileArea.innerHTML = `<div class="empty">暂无文件，请先上传</div>`;
+                    return;
+                }
+
+                fileArea.innerHTML = `
+      <table>
+        <thead>
+          <tr>
+            <th>文件名</th>
+            <th>大小</th>
+            <th>上传时间</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${files.map(file => `
+            <tr>
+              <td>${file.original_name}</td>
+              <td>${formatSize(file.size)}</td>
+              <td>${file.uploaded_at}</td>
+              <td>
+                <div class="actions">
+                  <button class="preview" onclick="previewFile(${file.id}, '${escapeText(file.original_name)}')">预览</button>
+                  <a class="download" href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
+                  <button class="btn-delete" onclick="deleteFile(${file.id})">删除</button>
+                </div>
+              </td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+            } catch (error) {
+                fileArea.innerHTML = `<div class="empty">请求失败：${error.message}</div>`;
+                console.error(error);
             }
-
-            const files = await res.json();
-
-            if (files.length === 0) {
-                fileArea.innerHTML = `<div class="empty">暂无文件，请先上传</div>`;
-                return;
-            }
-
-            fileArea.innerHTML = `
-            <table>
-              <thead>
-                <tr>
-                  <th>文件名</th>
-                  <th>大小</th>
-                  <th>上传时间</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${files.map(file => `
-                  <tr>
-                    <td>${file.original_name}</td>
-                    <td>${formatSize(file.size)}</td>
-                    <td>${file.uploaded_at}</td>
-                    <td>
-                      <div class="actions">
-                        <button class="preview" onclick="previewFile(${file.id}, '${escapeText(file.original_name)}')">预览</button>
-                        <a class="download" href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
-                        <button class="btn-delete" onclick="deleteFile(${file.id})">删除</button>
-                      </div>
-                    </td>
-                  </tr>
-                `).join("")}
-              </tbody>
-            </table>
-          `;
         }
+
 
         async function deleteFile(id) {
             if (!confirm("确定删除这个文件吗？")) return;
