@@ -208,6 +208,26 @@ app.get("/api/download/:id", requireLogin, function (req, res) {
   );
 });
 
+app.get("/api/preview/:id", requireLogin, function (req, res) {
+  db.get(
+    "SELECT * FROM files WHERE id = ? AND user_id = ?",
+    [req.params.id, req.session.userId],
+    function (err, file) {
+      if (err) return res.status(500).send("服务器错误");
+      if (!file) return res.status(404).send("文件不存在");
+
+      const filePath = path.join(__dirname, "uploads", file.saved_name);
+
+      res.setHeader(
+        "Content-Disposition",
+        "inline; filename*=UTF-8''" + encodeURIComponent(file.original_name)
+      );
+
+      res.sendFile(filePath);
+    }
+  );
+});
+
 // 删除文件
 app.delete("/api/file/:id", requireLogin, function (req, res) {
   db.get(
