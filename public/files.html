@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>我的文件</title>
+
     <style>
         body {
             font-family: Arial, "Microsoft YaHei", sans-serif;
@@ -13,12 +14,12 @@
         }
 
         .box {
-            max-width: 960px;
+            max-width: 1100px;
             margin: 0 auto;
             background: white;
             padding: 28px;
             border-radius: 14px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
         }
 
         .top {
@@ -30,53 +31,54 @@
 
         h2 {
             margin: 0;
-            font-size: 28px;
+            font-size: 32px;
         }
 
         .upload-area {
             display: flex;
-            gap: 10px;
+            gap: 14px;
             align-items: center;
-            padding: 18px;
+            padding: 22px;
             background: #f0f4ff;
             border-radius: 10px;
-            margin-bottom: 20px;
+            margin-bottom: 28px;
         }
 
-        button, .download, .preview {
+        button,
+        .download,
+        .preview {
             border: none;
-            padding: 8px 14px;
-            border-radius: 6px;
+            padding: 9px 16px;
+            border-radius: 7px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 15px;
             text-decoration: none;
+            color: white;
+        }
+
+        .btn-upload {
+            background: #2563eb;
+        }
+
+        .btn-logout {
+            background: #555;
+        }
+
+        .btn-delete {
+            background: #dc2626;
+        }
+
+        .download {
+            background: #16a34a;
         }
 
         .preview {
             background: #7c3aed;
         }
 
-        .btn-upload {
-            background: #2563eb;
-            color: white;
-        }
-
-        .btn-logout {
-            background: #555;
-            color: white;
-        }
-
-        .btn-delete {
-            background: #dc2626;
-            color: white;
-        }
-
-        .download {
-            background: #16a34a;
-            color: white;
-        }
-
-            button:hover, .download:hover, .preview:hover {
+            button:hover,
+            .download:hover,
+            .preview:hover {
                 opacity: 0.85;
             }
 
@@ -84,23 +86,33 @@
             min-height: 24px;
             color: #2563eb;
             font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        h3 {
+            margin-top: 30px;
+            font-size: 24px;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
             margin-top: 16px;
+            background: white;
         }
 
-        th, td {
-            padding: 12px;
+        th,
+        td {
+            padding: 14px;
             border-bottom: 1px solid #e5e7eb;
             text-align: left;
+            vertical-align: middle;
         }
 
         th {
             background: #f9fafb;
             color: #555;
+            font-size: 16px;
         }
 
         .actions {
@@ -112,13 +124,71 @@
         .empty {
             text-align: center;
             color: #888;
-            padding: 40px;
+            padding: 48px;
             background: #fafafa;
             border-radius: 10px;
             margin-top: 20px;
+            font-size: 18px;
+        }
+
+        /* 预览弹窗 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 9999;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.65);
+        }
+
+        .modal-content {
+            background: white;
+            width: 86%;
+            height: 86%;
+            margin: 35px auto;
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-header {
+            padding: 14px 18px;
+            background: #111827;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #previewTitle {
+            font-size: 16px;
+            font-weight: bold;
+            word-break: break-all;
+        }
+
+        .modal-body {
+            flex: 1;
+            background: #f3f4f6;
+        }
+
+            .modal-body iframe {
+                width: 100%;
+                height: 100%;
+                border: none;
+                background: white;
+            }
+
+        .close-btn {
+            background: #dc2626;
+            color: white;
         }
     </style>
 </head>
+
 <body>
     <div class="box">
         <div class="top">
@@ -140,6 +210,20 @@
         </div>
     </div>
 
+    <!-- 预览弹窗 -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span id="previewTitle">文件预览</span>
+                <button class="close-btn" onclick="closePreview()">关闭</button>
+            </div>
+
+            <div class="modal-body">
+                <iframe id="previewFrame"></iframe>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = "https://file-system-demo-production.up.railway.app";
 
@@ -157,20 +241,24 @@
             const formData = new FormData();
             formData.append("file", fileInput.files[0]);
 
-            const res = await fetch(API_BASE + "/api/upload", {
-                method: "POST",
-                credentials: "include",
-                body: formData
-            });
+            try {
+                const res = await fetch(API_BASE + "/api/upload", {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData
+                });
 
-            const data = await res.json();
+                const data = await res.json();
 
-            if (res.ok) {
-                msg.innerText = "上传成功";
-                fileInput.value = "";
-                loadFiles();
-            } else {
-                msg.innerText = data.error || "上传失败";
+                if (res.ok) {
+                    msg.innerText = "上传成功";
+                    fileInput.value = "";
+                    loadFiles();
+                } else {
+                    msg.innerText = data.error || "上传失败";
+                }
+            } catch (error) {
+                msg.innerText = "上传请求失败：" + error.message;
             }
         }
 
@@ -200,62 +288,89 @@
                 }
 
                 fileArea.innerHTML = `
-      <table>
-        <thead>
-          <tr>
-            <th>文件名</th>
-            <th>大小</th>
-            <th>上传时间</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${files.map(file => `
-            <tr>
-              <td>${file.original_name}</td>
-              <td>${formatSize(file.size)}</td>
-              <td>${file.uploaded_at}</td>
-              <td>
-                <div class="actions">
-                  <button class="preview" onclick="previewFile(${file.id}, '${escapeText(file.original_name)}')">预览</button>
-                  <a class="download" href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
-                  <button class="btn-delete" onclick="deleteFile(${file.id})">删除</button>
-                </div>
-              </td>
-            </tr>
-          `).join("")}
-        </tbody>
-      </table>
-    `;
+              <table>
+                <thead>
+                  <tr>
+                    <th>文件名</th>
+                    <th>大小</th>
+                    <th>上传时间</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${files.map(function (file) {
+                    return `
+                      <tr>
+                        <td>${escapeHtml(file.original_name)}</td>
+                        <td>${formatSize(file.size)}</td>
+                        <td>${file.uploaded_at}</td>
+                        <td>
+                          <div class="actions">
+                            <button class="preview" onclick="previewFile(${file.id}, '${escapeForJs(file.original_name)}')">预览</button>
+                            <a class="download" href="${API_BASE}/api/download/${file.id}" target="_blank">下载</a>
+                            <button class="btn-delete" onclick="deleteFile(${file.id})">删除</button>
+                          </div>
+                        </td>
+                      </tr>
+                    `;
+                }).join("")}
+                </tbody>
+              </table>
+            `;
             } catch (error) {
                 fileArea.innerHTML = `<div class="empty">请求失败：${error.message}</div>`;
                 console.error(error);
             }
         }
 
-
         async function deleteFile(id) {
-            if (!confirm("确定删除这个文件吗？")) return;
+            if (!confirm("确定删除这个文件吗？")) {
+                return;
+            }
 
-            const res = await fetch(API_BASE + "/api/file/" + id, {
-                method: "DELETE",
-                credentials: "include"
-            });
+            try {
+                const res = await fetch(API_BASE + "/api/file/" + id, {
+                    method: "DELETE",
+                    credentials: "include"
+                });
 
-            const data = await res.json();
+                const data = await res.json();
 
-            if (res.ok) {
-                document.getElementById("msg").innerText = "删除成功";
-                loadFiles();
-            } else {
-                document.getElementById("msg").innerText = data.error || "删除失败";
+                if (res.ok) {
+                    document.getElementById("msg").innerText = "删除成功";
+                    loadFiles();
+                } else {
+                    document.getElementById("msg").innerText = data.error || "删除失败";
+                }
+            } catch (error) {
+                document.getElementById("msg").innerText = "删除请求失败：" + error.message;
             }
         }
 
         function previewFile(id, name) {
+            const lowerName = name.toLowerCase();
+
+            const canPreview =
+                lowerName.endsWith(".pdf") ||
+                lowerName.endsWith(".png") ||
+                lowerName.endsWith(".jpg") ||
+                lowerName.endsWith(".jpeg") ||
+                lowerName.endsWith(".gif") ||
+                lowerName.endsWith(".txt");
+
+            if (!canPreview) {
+                alert("该文件类型暂不支持在线预览，请点击下载查看。");
+                return;
+            }
+
             document.getElementById("previewTitle").innerText = name;
             document.getElementById("previewFrame").src = API_BASE + "/api/preview/" + id;
             document.getElementById("previewModal").style.display = "block";
+        }
+
+        function closePreview() {
+            document.getElementById("previewFrame").src = "";
+            document.getElementById("previewModal").style.display = "none";
         }
 
         async function logout() {
@@ -274,11 +389,21 @@
             return (size / 1024 / 1024).toFixed(1) + " MB";
         }
 
-        function escapeText(text) {
+        function escapeHtml(text) {
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function escapeForJs(text) {
             return String(text)
                 .replace(/\\/g, "\\\\")
                 .replace(/'/g, "\\'")
-                .replace(/"/g, "&quot;");
+                .replace(/"/g, "&quot;")
+                .replace(/\n/g, " ");
         }
 
         loadFiles();
