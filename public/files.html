@@ -13,7 +13,7 @@
         }
 
         .box {
-            max-width: 1100px;
+            max-width: 960px;
             margin: 0 auto;
             background: white;
             padding: 28px;
@@ -30,15 +30,15 @@
 
         h2 {
             margin: 0;
-            font-size: 30px;
+            font-size: 28px;
         }
 
         .upload-area {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             align-items: center;
             padding: 18px;
-            background: #eef3ff;
+            background: #f0f4ff;
             border-radius: 10px;
             margin-bottom: 20px;
         }
@@ -50,27 +50,30 @@
             cursor: pointer;
             font-size: 14px;
             text-decoration: none;
-            color: white;
-        }
-
-        .btn-upload {
-            background: #2563eb;
-        }
-
-        .btn-logout {
-            background: #555;
-        }
-
-        .btn-delete {
-            background: #dc2626;
-        }
-
-        .download {
-            background: #16a34a;
         }
 
         .preview {
             background: #7c3aed;
+        }
+
+        .btn-upload {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-logout {
+            background: #555;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #dc2626;
+            color: white;
+        }
+
+        .download {
+            background: #16a34a;
+            color: white;
         }
 
             button:hover, .download:hover, .preview:hover {
@@ -114,54 +117,6 @@
             border-radius: 10px;
             margin-top: 20px;
         }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 999;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.65);
-        }
-
-        .modal-content {
-            background: white;
-            width: 85%;
-            height: 85%;
-            margin: 40px auto;
-            border-radius: 12px;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .modal-header {
-            padding: 12px 18px;
-            background: #111827;
-            color: white;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .modal-body {
-            flex: 1;
-            background: #f3f4f6;
-        }
-
-            .modal-body iframe {
-                width: 100%;
-                height: 100%;
-                border: none;
-                background: white;
-            }
-
-        .close-btn {
-            background: #dc2626;
-            color: white;
-        }
     </style>
 </head>
 <body>
@@ -185,27 +140,8 @@
         </div>
     </div>
 
-    <div class="modal" id="previewModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span id="previewTitle">文件预览</span>
-                <button class="close-btn" onclick="closePreview()">关闭</button>
-            </div>
-            <div class="modal-body">
-                <iframe id="previewFrame"></iframe>
-            </div>
-        </div>
-    </div>
-
     <script>
         const API_BASE = "https://file-system-demo-production.up.railway.app";
-
-        function formatSize(size) {
-            if (!size) return "-";
-            if (size < 1024) return size + " B";
-            if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
-            return (size / 1024 / 1024).toFixed(1) + " MB";
-        }
 
         async function uploadFile() {
             const fileInput = document.getElementById("file");
@@ -245,8 +181,8 @@
                 credentials: "include"
             });
 
-            if (!res.ok) {
-                fileArea.innerHTML = `<div class="empty">未登录，请重新登录</div>`;
+            if (res.status === 401) {
+                document.getElementById("fileArea").innerHTML = "未登录，请重新登录";
                 return;
             }
 
@@ -287,21 +223,6 @@
           `;
         }
 
-        function escapeText(text) {
-            return String(text).replace(/'/g, "\\'");
-        }
-
-        function previewFile(id, name) {
-            document.getElementById("previewTitle").innerText = name;
-            document.getElementById("previewFrame").src = API_BASE + "/api/preview/" + id;
-            document.getElementById("previewModal").style.display = "block";
-        }
-
-        function closePreview() {
-            document.getElementById("previewFrame").src = "";
-            document.getElementById("previewModal").style.display = "none";
-        }
-
         async function deleteFile(id) {
             if (!confirm("确定删除这个文件吗？")) return;
 
@@ -320,6 +241,12 @@
             }
         }
 
+        function previewFile(id, name) {
+            document.getElementById("previewTitle").innerText = name;
+            document.getElementById("previewFrame").src = API_BASE + "/api/preview/" + id;
+            document.getElementById("previewModal").style.display = "block";
+        }
+
         async function logout() {
             await fetch(API_BASE + "/api/logout", {
                 method: "POST",
@@ -327,6 +254,13 @@
             });
 
             window.location.href = "login.html";
+        }
+
+        function formatSize(size) {
+            if (!size) return "-";
+            if (size < 1024) return size + " B";
+            if (size < 1024 * 1024) return (size / 1024).toFixed(1) + " KB";
+            return (size / 1024 / 1024).toFixed(1) + " MB";
         }
 
         loadFiles();

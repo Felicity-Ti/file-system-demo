@@ -208,6 +208,7 @@ app.get("/api/download/:id", requireLogin, function (req, res) {
   );
 });
 
+//预览文件
 app.get("/api/preview/:id", requireLogin, function (req, res) {
   db.get(
     "SELECT * FROM files WHERE id = ? AND user_id = ?",
@@ -217,6 +218,19 @@ app.get("/api/preview/:id", requireLogin, function (req, res) {
       if (!file) return res.status(404).send("文件不存在");
 
       const filePath = path.join(__dirname, "uploads", file.saved_name);
+      const ext = path.extname(file.original_name).toLowerCase();
+
+      if (ext === ".pdf") {
+        res.type("application/pdf");
+      } else if ([".jpg", ".jpeg"].includes(ext)) {
+        res.type("image/jpeg");
+      } else if (ext === ".png") {
+        res.type("image/png");
+      } else if (ext === ".gif") {
+        res.type("image/gif");
+      } else if (ext === ".txt") {
+        res.type("text/plain; charset=utf-8");
+      }
 
       res.setHeader(
         "Content-Disposition",
